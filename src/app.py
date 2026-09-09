@@ -3,477 +3,462 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-from simulation import run_simulation
-
-
-# ============================================================
-# PAGE CONFIGURATION
-# ============================================================
-
-st.set_page_config(
-    page_title="Overdose Policy Simulator",
-    page_icon="📊",
-    layout="wide"
+from simulation import (
+    run_simulation,
+    calculate_fiscal_summary,
+    BASELINE_NALOXONE_RATE,
 )
 
 
-# ============================================================
-# PATHS
-# ============================================================
+# PAGE CONFIGURATION
+st.set_page_config(
+    page_title="Overdose Policy Fiscal Simulator",
+    page_icon="🏥",
+    layout="wide",
+)
 
+
+# PROJECT PATHS
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data" / "processed"
 
 
-# ============================================================
 # LOAD HISTORICAL DATA
-# ============================================================
-
 @st.cache_data
 def load_historical_data():
 
-    data_path = (
+    file_path = (
         DATA_DIR /
         "master_modeling_dataset.csv"
     )
 
-    return pd.read_csv(data_path)
+    df = pd.read_csv(file_path)
+
+    df["Quarter_Label"] = (
+        df["Year"].astype(str)
+        + " Q"
+        + df["Quarter"].astype(str)
+    )
+
+    return df
 
 
 historical_data = load_historical_data()
 
 
-# ============================================================
 # TITLE
-# ============================================================
+st.title("Overdose Policy Fiscal Simulator")
 
-st.title("Overdose Policy Simulator")
+st.markdown(
+    """
+This interactive simulator allows users to explore the potential
+**fiscal impact** of different implementation levels for selected
+overdose prevention and harm reduction interventions in Canada.
 
-st.write(
-    """
-    Explore how different implementation levels of overdose
-    prevention interventions affect projected activity,
-    costs, and selected economic outcomes.
-    """
+The model uses Canadian historical data and published cost estimates
+to produce scenario-based estimates of intervention costs and
+directly supported potential fiscal savings.
+
+Results are intended for **decision support and scenario analysis**,
+not as predictions of future health outcomes.
+"""
 )
 
 
-st.divider()
+# SIDEBAR — POLICY INPUTS
+st.sidebar.header("Policy Implementation")
 
+st.sidebar.markdown(
+    """
+Choose the implementation level for each intervention.
 
-# ============================================================
-# POLICY INPUTS
-# ============================================================
+The percentages represent an **increase in intervention activity
+relative to the 2024 baseline**.
 
-st.header("Policy Implementation")
-
-st.write(
-    "Select an implementation level for each intervention."
+They do **not** represent the percentage of the population receiving
+the intervention.
+"""
 )
 
 
-col1, col2, col3 = st.columns(3)
+# SCS
+scs_percent = st.sidebar.slider(
+    "Supervised Consumption Services (SCS)",
+    min_value=0,
+    max_value=100,
+    value=0,
+    step=1,
+)
 
 
-with col1:
-
-    st.subheader("SCS")
-
-    scs_percentage = st.slider(
-        "SCS implementation",
-        min_value=0,
-        max_value=100,
-        value=50,
-        step=1,
-        format="%d%%"
-    )
+# Virtual Overdose Monitoring
+nors_percent = st.sidebar.slider(
+    "Virtual Overdose Monitoring",
+    min_value=0,
+    max_value=100,
+    value=0,
+    step=1,
+)
 
 
-with col2:
-
-    st.subheader("Virtual Monitoring")
-
-    nors_percentage = st.slider(
-        "Virtual monitoring implementation",
-        min_value=0,
-        max_value=100,
-        value=50,
-        step=1,
-        format="%d%%"
-    )
+# Naloxone
+naloxone_percent = st.sidebar.slider(
+    "Naloxone Distribution",
+    min_value=0,
+    max_value=100,
+    value=0,
+    step=1,
+)
 
 
-with col3:
-
-    st.subheader("Naloxone")
-
-    naloxone_percentage = st.slider(
-        "Naloxone implementation",
-        min_value=0,
-        max_value=100,
-        value=50,
-        step=1,
-        format="%d%%"
-    )
+# Convert percentages to decimal rates
+scs_rate = scs_percent / 100
+nors_rate = nors_percent / 100
+naloxone_rate = naloxone_percent / 100
 
 
-# Convert percentages to 0-1
-
-scs_rate = scs_percentage / 100
-
-nors_rate = nors_percentage / 100
-
-naloxone_rate = naloxone_percentage / 100
-
-
-# ============================================================
 # RUN SIMULATION
-# ============================================================
-
 results = run_simulation(
-    scs_rate,
-    nors_rate,
-    naloxone_rate
+    scs_rate=scs_rate,
+    nors_rate=nors_rate,
+    naloxone_rate=naloxone_rate,
 )
+
+fiscal = calculate_fiscal_summary(
+    results
+)
+
+
+# INTERPRETATION GUIDE
+st.info(
+    """
+### How to interpret the implementation percentages
+
+The percentages represent a **change relative to the 2024 baseline**,
+not the percentage of the Canadian population receiving an intervention.
+
+**SCS:** The implementation percentage increases SCS activity relative
+to the 2024 quarterly baseline. The model then estimates additional
+operating cost and potential emergency-service savings.
+
+**Virtual Overdose Monitoring:** The implementation percentage scales
+the program-level quarterly cost assumption. The model does not
+project response volume or national healthcare savings because a
+sufficiently reliable national activity baseline is unavailable.
+
+**Naloxone:** The implementation percentage increases the modeled
+distribution rate relative to the 2024 Canadian baseline. The model
+estimates the associated additional distribution cost.
+
+The model does not automatically assume reductions in mortality,
+hospitalizations, or emergency-department visits.
+"""
+)
+
+
+# FISCAL SUMMARY CARDS
+st.header("Fiscal Outcomes")
+
+
+# SCS FISCAL RESULTS
+st.header("Supervised Consumption Services")
 
 scs = results["scs"]
 
-nors = results["nors"]
-
-naloxone = results["naloxone"]
-
-
-st.divider()
-
-st.header("Projected Impact")
-
-
-# ============================================================
-# SCS RESULTS
-# ============================================================
-
-st.subheader(
-    f"Supervised Consumption Services — {scs_percentage}%"
-)
 
 col1, col2, col3 = st.columns(3)
+
 
 with col1:
 
     st.metric(
-        "Projected Visits / Quarter",
-        f"{scs['projected_visits']:,.0f}"
+        "Implementation",
+        f"{scs_percent}%",
     )
+
 
 with col2:
 
     st.metric(
-        "Additional Visits",
-        f"{scs['incremental_visits']:,.0f}"
+        "Additional Visits / Quarter",
+        f"{scs['incremental_visits']:,.0f}",
     )
+
 
 with col3:
 
     st.metric(
-        "Additional Events",
-        f"{scs['additional_events']:,.0f}"
+        "Projected Visits / Quarter",
+        f"{scs['projected_visits']:,.0f}",
     )
 
 
 col1, col2, col3 = st.columns(3)
 
+
 with col1:
 
     st.metric(
-        "Avoided Emergency Cost",
-        f"${scs['avoided_emergency_cost']:,.0f}"
+        "Potential Emergency-Service Savings",
+        f"${scs['avoided_emergency_cost']:,.0f}",
     )
+
 
 with col2:
 
     st.metric(
-        "Operating Cost",
-        f"${scs['operating_cost']:,.0f}"
+        "SCS Operating Cost",
+        f"${scs['operating_cost']:,.0f}",
     )
+
 
 with col3:
 
     st.metric(
         "Net Fiscal Impact",
-        f"${scs['net_fiscal_impact']:,.0f}"
+        f"${scs['net_fiscal_impact']:,.0f}",
     )
 
 
-# ============================================================
-# NORS RESULTS
-# ============================================================
+st.markdown(
+    """
+### SCS cost calculation
 
-st.divider()
+The model estimates additional SCS visits from the selected
+implementation increase. The observed 2024 SCS non-fatal
+overdose-event rate is then applied to those additional visits.
 
-st.subheader(
-    f"Virtual Overdose Monitoring — {nors_percentage}%"
+The resulting events are adjusted using the 2024 Safeworks
+onsite-management rate.
+
+Potential emergency-service savings are based on the published
+combined cost of EMS, emergency-department care, and physician
+assessment.
+
+The SCS fiscal calculation is:
+
+**Potential Emergency-Service Savings − SCS Operating Cost**
+"""
 )
 
-st.info(
-    """
-    This component uses published National Overdose Response
-    Service (NORS) program activity as a benchmark. It is not a
-    national population baseline.
-    """
+
+# SCS COST VS SAVINGS CHART
+
+st.subheader("SCS Cost vs Potential Savings")
+
+scs_chart_data = pd.DataFrame(
+    {
+        "Category": [
+            "Operating Cost",
+            "Potential Savings",
+        ],
+        "Amount": [
+            scs["operating_cost"],
+            scs["avoided_emergency_cost"],
+        ],
+    }
 )
 
 
-col1, col2, col3 = st.columns(3)
+fig, ax = plt.subplots(
+    figsize=(8, 4.5)
+)
 
-with col1:
+ax.bar(
+    scs_chart_data["Category"],
+    scs_chart_data["Amount"],
+)
 
-    st.metric(
-        "Projected Responses / Quarter",
-        f"{nors['projected_responses']:,.2f}"
-    )
+ax.set_ylabel("CAD / Quarter")
 
-with col2:
+ax.set_title(
+    "SCS Modeled Cost and Potential Savings"
+)
 
-    st.metric(
-        "Healthcare Savings",
-        f"${nors['healthcare_savings']:,.0f}"
-    )
+plt.tight_layout()
 
-with col3:
+st.pyplot(fig)
 
-    st.metric(
-        "Program Cost",
-        f"${nors['operating_cost']:,.0f}"
-    )
+plt.close(fig)
+
+
+# VIRTUAL OVERDOSE MONITORING
+st.header("Virtual Overdose Monitoring")
+
+nors = results["nors"]
 
 
 col1, col2 = st.columns(2)
 
+
 with col1:
 
     st.metric(
-        "Healthcare-Only Net Impact",
-        f"${nors['healthcare_net_impact']:,.0f}"
+        "Implementation",
+        f"{nors_percent}%",
     )
+
+
+with col2:
+
+    st.metric(
+        "Program Cost / Quarter",
+        f"${nors['operating_cost']:,.0f}",
+    )
+
+
+st.subheader("Published Evidence References")
+
+
+col1, col2 = st.columns(2)
+
+
+with col1:
+
+    st.metric(
+        "Published Savings / Response",
+        f"${nors['published_savings_per_response']:,.2f}",
+    )
+
 
 with col2:
 
     st.metric(
         "Published Benefit-Cost Ratio",
-        "8.59"
+        f"{nors['published_benefit_cost_ratio']:.2f}",
     )
 
 
-# ============================================================
-# NALOXONE RESULTS
-# ============================================================
+# NALOXONE
+st.header("Naloxone Distribution")
 
-st.divider()
+naloxone = results["naloxone"]
 
-st.subheader(
-    f"Naloxone Distribution — {naloxone_percentage}%"
-)
 
 col1, col2, col3 = st.columns(3)
+
 
 with col1:
 
     st.metric(
-        "Baseline Kits / 100k / Quarter",
-        f"{1731.56:,.0f}"
+        "Implementation",
+        f"{naloxone_percent}%",
     )
+
 
 with col2:
 
     st.metric(
-        "Projected Kits / 100k / Quarter",
-        f"{naloxone['projected_kits_per_100k']:,.0f}"
+        "Baseline Distribution Rate",
+        f"{BASELINE_NALOXONE_RATE:,.0f}",
+        help="Kits distributed per 100,000 population per quarter.",
     )
+
 
 with col3:
 
     st.metric(
-        "Additional Kits / 100k",
-        f"{naloxone['incremental_kits_per_100k']:,.0f}"
+        "Projected Distribution Rate",
+        f"{naloxone['projected_kits_per_100k']:,.0f}",
     )
 
 
-st.metric(
-    "Additional Cost / 100k",
-    f"${naloxone['incremental_cost_per_100k']:,.0f}"
-)
+col1, col2 = st.columns(2)
 
 
-st.caption(
-    "The base model does not apply an unsupported mortality-"
-    "reduction estimate to additional naloxone distribution."
-)
+with col1:
+
+    st.metric(
+        "Additional Distribution",
+        f"{naloxone['incremental_kits_per_100k']:,.0f}",
+    )
 
 
-# ============================================================
-# COST COMPARISON
-# ============================================================
+with col2:
 
-st.divider()
+    st.metric(
+        "Additional Cost / 100k / Quarter",
+        f"${naloxone['incremental_cost_per_100k']:,.0f}",
+    )
 
-st.header("Intervention Cost Comparison")
 
-cost_data = pd.DataFrame(
+# MODELED INTERVENTION COSTS
+st.subheader("Modeled Intervention Costs")
+
+cost_data = pd.DataFrame({
+    "Intervention": [
+        "Supervised Consumption\nServices",
+        "Virtual Overdose\nMonitoring",
+        "Naloxone Distribution"
+    ],
+    "Cost": [
+        scs["operating_cost"],
+        nors["operating_cost"],
+        naloxone["incremental_cost_per_100k"]
+    ]
+})
+
+fig, ax = plt.subplots(figsize=(8, 3.8))
+
+bars = ax.barh(cost_data["Intervention"], cost_data["Cost"])
+
+# Add value labels
+for bar in bars:
+    width = bar.get_width()
+    ax.text(
+        width,
+        bar.get_y() + bar.get_height()/2,
+        f" ${width:,.0f}",
+        va="center",
+        ha="left",
+        fontsize=10
+    )
+
+ax.set_xlabel("Modeled Cost (CAD)")
+ax.set_title("Modeled Intervention Costs")
+ax.spines["top"].set_visible(False)
+ax.spines["right"].set_visible(False)
+
+plt.tight_layout()
+st.pyplot(fig)
+plt.close(fig)
+
+
+# INTERVENTION COST TABLE
+st.header("Fiscal Cost Summary")
+
+summary_table = pd.DataFrame(
     {
         "Intervention": [
-            "SCS",
-            "Virtual Monitoring",
-            "Naloxone"
+            "Supervised Consumption Services",
+            "Virtual Overdose Monitoring",
+            "Naloxone Distribution",
         ],
-        "Cost": [
-            scs["operating_cost"],
-            nors["operating_cost"],
-            naloxone["incremental_cost_per_100k"]
-        ]
+        "Implementation": [
+            f"{scs_percent}%",
+            f"{nors_percent}%",
+            f"{naloxone_percent}%",
+        ],
+        "Modeled Cost": [
+            f"${scs['operating_cost']:,.0f} / quarter",
+            f"${nors['operating_cost']:,.0f} / quarter",
+            f"${naloxone['incremental_cost_per_100k']:,.0f} / 100k / quarter",
+        ],
+        "Potential Direct Savings": [
+            f"${scs['avoided_emergency_cost']:,.0f}",
+            "Not projected",
+            "Not projected",
+        ],
+        "Net Fiscal Impact": [
+            f"${scs['net_fiscal_impact']:,.0f}",
+            "Not projected",
+            "Not projected",
+        ],
     }
 )
 
-
-fig, ax = plt.subplots()
-
-ax.bar(
-    cost_data["Intervention"],
-    cost_data["Cost"]
-)
-
-ax.set_ylabel("CAD")
-ax.set_title("Projected Incremental Cost")
-
-st.pyplot(fig)
-
-
-# ============================================================
-# HISTORICAL CONTEXT
-# ============================================================
-
-st.divider()
-
-st.header("Historical Context")
-
-st.write(
-    """
-    Historical Canadian health-outcome data are shown for
-    context. These trends are not interpreted as causal estimates
-    of intervention effectiveness.
-    """
-)
-
-
-historical_plot = historical_data.copy()
-
-historical_plot["Date"] = pd.PeriodIndex(
-    historical_plot["Year"].astype(str)
-    + "Q"
-    + historical_plot["Quarter"].astype(str),
-    freq="Q"
-).to_timestamp()
-
-
-fig, ax = plt.subplots()
-
-ax.plot(
-    historical_plot["Date"],
-    historical_plot["Opioid_Deaths"],
-    label="Opioid Deaths"
-)
-
-ax.plot(
-    historical_plot["Date"],
-    historical_plot["Hospitalizations"],
-    label="Hospitalizations"
-)
-
-ax.plot(
-    historical_plot["Date"],
-    historical_plot["ED_Visits"],
-    label="ED Visits"
-)
-
-ax.set_xlabel("Year")
-ax.set_ylabel("Number")
-ax.set_title(
-    "Canadian Opioid-Related Health Outcomes"
-)
-
-ax.legend()
-
-st.pyplot(fig)
-
-
-# ============================================================
-# METHODOLOGY
-# ============================================================
-
-st.divider()
-
-with st.expander("How the Simulator Works"):
-
-    st.markdown(
-        """
-        ### 1. User inputs
-
-        The user independently selects an implementation rate for
-        SCS, virtual overdose monitoring, and naloxone.
-
-        The three rates do not have to be the same.
-
-        ### 2. SCS
-
-        Additional SCS visits are calculated from the 2024
-        quarterly baseline.
-
-        The observed 2024 SCS nonfatal-overdose event rate is
-        applied to the additional visits.
-
-        Estimated emergency costs avoided are based on the
-        published SCS cost analysis.
-
-        SCS operating costs use a provisional $52 CAD per visit
-        estimate from a Calgary SCS cost study.
-
-        ### 3. Virtual overdose monitoring
-
-        The model uses published NORS program activity as a
-        benchmark.
-
-        Published healthcare savings of $4,470.82 per community
-        overdose response are used.
-
-        The published 8.59 benefit-cost ratio is displayed
-        separately.
-
-        ### 4. Naloxone
-
-        The model uses the observed Canadian naloxone distribution
-        rate per 100,000 population.
-
-        A $50 CAD per-kit cost assumption is applied.
-
-        No unsupported mortality-effectiveness estimate is used.
-
-        ### Important limitation
-
-        These are scenario projections based on published
-        parameters and observed baseline activity.
-
-        The simulator does not claim that changing an
-        implementation percentage will directly cause a specific
-        change in national mortality or hospitalization.
-        """
-    )
-
-
-# ============================================================
-# FOOTER
-# ============================================================
-
-st.divider()
-
-st.caption(
-    "Overdose Policy Simulator | AI-Augmented Policy Analysis Pilot"
+st.dataframe(
+    summary_table,
+    use_container_width=True,
+    hide_index=True,
 )

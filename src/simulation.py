@@ -4,8 +4,13 @@ import pandas as pd
 
 # ============================================================
 # OVERDOSE POLICY SIMULATOR
-# Simulation Engine
+# Fiscal Simulation Engine
 # Canada - 2024 baseline
+# ============================================================
+
+
+# ============================================================
+# 1. PROJECT PATHS
 # ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -13,21 +18,26 @@ DATA_DIR = BASE_DIR / "data" / "processed"
 
 
 # ============================================================
-# 1. MODEL PARAMETERS
+# 2. MODEL PARAMETERS
 # ============================================================
 
+
 # ------------------------------------------------------------
-# SCS
+# Supervised Consumption Services (SCS)
 # ------------------------------------------------------------
 
+# Provisional operating cost transferred from Calgary Safeworks
 SCS_COST_PER_VISIT = 52.00
 
 # 2024 Safeworks:
 # 1,035 adverse events
 # 9 EMS call-outs
+#
+# Used to estimate the proportion of events potentially managed
+# onsite without EMS.
 SCS_ONSITE_MANAGEMENT_RATE = 1 - (9 / 1035)
 
-# EMS + ED + physician assessment
+# EMS + emergency department + physician assessment
 SCS_AVOIDED_EMERGENCY_COST = 1622.00
 
 
@@ -35,17 +45,24 @@ SCS_AVOIDED_EMERGENCY_COST = 1622.00
 # Virtual Overdose Monitoring (NORS)
 # ------------------------------------------------------------
 
+# Program-level cost assumption
 NORS_PROGRAM_COST_2_YEARS = 1_592_000.00
 
+# Two years = 8 quarters
 NORS_PROGRAM_COST_PER_QUARTER = (
     NORS_PROGRAM_COST_2_YEARS / 8
 )
 
+# Published healthcare-system savings per response.
+# Reference value only.
 NORS_SAVINGS_PER_RESPONSE = 4_470.82
 
-# Sensitivity/threshold value only
+# Published sensitivity/threshold value.
+# Reference value only.
 NORS_CALL_COST_THRESHOLD = 450.00
 
+# Published benefit-cost ratio.
+# Reference value only.
 NORS_BENEFIT_COST_RATIO = 8.59
 
 
@@ -53,11 +70,12 @@ NORS_BENEFIT_COST_RATIO = 8.59
 # Naloxone
 # ------------------------------------------------------------
 
+# Provisional cost assumption
 NALOXONE_COST_PER_KIT = 50.00
 
 
 # ============================================================
-# 2. LOAD 2024 BASELINE
+# 3. LOAD 2024 BASELINE
 # ============================================================
 
 baseline_path = DATA_DIR / "baseline_2024.csv"
@@ -66,9 +84,10 @@ baseline = pd.read_csv(baseline_path).iloc[0]
 
 
 # ============================================================
-# 3. BASELINE VALUES
+# 4. BASELINE VALUES
 # ============================================================
 
+# SCS
 BASELINE_SCS_VISITS = float(
     baseline["SCS_Total_Visits"]
 )
@@ -77,41 +96,31 @@ BASELINE_SCS_EVENTS = float(
     baseline["SCS_Nonfatal_Overdoses"]
 )
 
+# Observed 2024 SCS non-fatal overdose event rate
 SCS_EVENT_RATE = (
     BASELINE_SCS_EVENTS /
     BASELINE_SCS_VISITS
 )
 
 
+# Naloxone
 BASELINE_NALOXONE_RATE = float(
     baseline["Naloxone_Kits_Per_100k"]
 )
 
 
 # ============================================================
-# 4. NORS ACTIVITY BENCHMARK
-# ============================================================
-
-NORS_OBSERVED_RESPONSES = 11
-NORS_OBSERVATION_QUARTERS = 7
-
-NORS_RESPONSE_BENCHMARK = (
-    NORS_OBSERVED_RESPONSES /
-    NORS_OBSERVATION_QUARTERS
-)
-
-
-# ============================================================
-# 5. VALIDATE USER INPUT
+# 5. INPUT VALIDATION
 # ============================================================
 
 def validate_implementation_rate(implementation_rate):
     """
-    Convert an implementation rate to a value between 0 and 1.
+    Convert an implementation rate into a decimal between 0 and 1.
 
     Examples:
         0.50 -> 0.50
         50   -> 0.50
+        100  -> 1.00
     """
 
     implementation_rate = float(
@@ -135,14 +144,28 @@ def validate_implementation_rate(implementation_rate):
 
 
 # ============================================================
-# 6. SCS CALCULATION
+# 6. SCS FISCAL CALCULATION
 # ============================================================
 
 def simulate_scs(implementation_rate):
+    """
+    Calculate the fiscal impact of increasing SCS activity.
+
+    The implementation percentage represents an increase relative
+    to the 2024 quarterly baseline.
+
+    Example:
+        50% implementation means 50% more SCS visits than the
+        2024 baseline.
+    """
 
     rate = validate_implementation_rate(
         implementation_rate
     )
+
+    # --------------------------------------------------------
+    # Additional activity
+    # --------------------------------------------------------
 
     incremental_visits = (
         BASELINE_SCS_VISITS * rate
@@ -153,25 +176,45 @@ def simulate_scs(implementation_rate):
         incremental_visits
     )
 
+    # --------------------------------------------------------
+    # Estimate additional non-fatal overdose events
+    # --------------------------------------------------------
+
     additional_events = (
         incremental_visits *
         SCS_EVENT_RATE
     )
+
+    # --------------------------------------------------------
+    # Estimate events potentially managed onsite
+    # --------------------------------------------------------
 
     onsite_events = (
         additional_events *
         SCS_ONSITE_MANAGEMENT_RATE
     )
 
+    # --------------------------------------------------------
+    # Potential emergency-service savings
+    # --------------------------------------------------------
+
     avoided_emergency_cost = (
         onsite_events *
         SCS_AVOIDED_EMERGENCY_COST
     )
 
+    # --------------------------------------------------------
+    # Additional SCS operating cost
+    # --------------------------------------------------------
+
     operating_cost = (
         incremental_visits *
         SCS_COST_PER_VISIT
     )
+
+    # --------------------------------------------------------
+    # Net fiscal impact
+    # --------------------------------------------------------
 
     net_fiscal_impact = (
         avoided_emergency_cost -
@@ -180,6 +223,7 @@ def simulate_scs(implementation_rate):
 
     return {
         "implementation_rate": rate,
+        "baseline_visits": BASELINE_SCS_VISITS,
         "projected_visits": projected_visits,
         "incremental_visits": incremental_visits,
         "additional_events": additional_events,
@@ -191,73 +235,88 @@ def simulate_scs(implementation_rate):
 
 
 # ============================================================
-# 7. VIRTUAL OVERDOSE MONITORING CALCULATION
+# 7. VIRTUAL OVERDOSE MONITORING FISCAL CALCULATION
 # ============================================================
 
 def simulate_nors(implementation_rate):
+    """
+    Calculate the program-level cost of virtual overdose monitoring.
+
+    The implementation percentage scales the quarterly program-cost
+    assumption.
+
+    The model does NOT project:
+        - response volume
+        - healthcare savings
+        - healthcare net impact
+
+    because a sufficiently reliable national response-volume baseline
+    is not available.
+    """
 
     rate = validate_implementation_rate(
         implementation_rate
     )
 
-    projected_responses = (
-        NORS_RESPONSE_BENCHMARK * rate
-    )
-
-    healthcare_savings = (
-        projected_responses *
-        NORS_SAVINGS_PER_RESPONSE
-    )
-
+    # Program-level quarterly cost
     operating_cost = (
         NORS_PROGRAM_COST_PER_QUARTER *
         rate
     )
 
-    healthcare_net_impact = (
-        healthcare_savings -
-        operating_cost
-    )
-
-    broader_benefits = (
-        operating_cost *
-        NORS_BENEFIT_COST_RATIO
-    )
-
-    broader_net_benefit = (
-        broader_benefits -
-        operating_cost
-    )
-
     return {
         "implementation_rate": rate,
-        "projected_responses": projected_responses,
-        "healthcare_savings": healthcare_savings,
         "operating_cost": operating_cost,
-        "healthcare_net_impact": healthcare_net_impact,
-        "published_broader_benefits": broader_benefits,
-        "published_broader_net_benefit": broader_net_benefit,
+
+        # Not projected in the base model
+        "healthcare_savings": None,
+        "healthcare_net_impact": None,
+
+        # Evidence-only reference values
+        "published_savings_per_response":
+            NORS_SAVINGS_PER_RESPONSE,
+
+        "published_benefit_cost_ratio":
+            NORS_BENEFIT_COST_RATIO,
+
+        "call_cost_threshold":
+            NORS_CALL_COST_THRESHOLD,
     }
 
 
 # ============================================================
-# 8. NALOXONE CALCULATION
+# 8. NALOXONE FISCAL CALCULATION
 # ============================================================
 
 def simulate_naloxone(implementation_rate):
+    """
+    Calculate the additional cost associated with increasing
+    naloxone distribution relative to the 2024 baseline.
+
+    The result is expressed per 100,000 population per quarter.
+    """
 
     rate = validate_implementation_rate(
         implementation_rate
     )
 
+    # --------------------------------------------------------
+    # Additional distribution
+    # --------------------------------------------------------
+
     incremental_kits_rate = (
-        BASELINE_NALOXONE_RATE * rate
+        BASELINE_NALOXONE_RATE *
+        rate
     )
 
     projected_kits_rate = (
         BASELINE_NALOXONE_RATE +
         incremental_kits_rate
     )
+
+    # --------------------------------------------------------
+    # Additional distribution cost
+    # --------------------------------------------------------
 
     incremental_cost = (
         incremental_kits_rate *
@@ -266,9 +325,17 @@ def simulate_naloxone(implementation_rate):
 
     return {
         "implementation_rate": rate,
-        "projected_kits_per_100k": projected_kits_rate,
-        "incremental_kits_per_100k": incremental_kits_rate,
-        "incremental_cost_per_100k": incremental_cost,
+        "baseline_kits_per_100k":
+            BASELINE_NALOXONE_RATE,
+
+        "projected_kits_per_100k":
+            projected_kits_rate,
+
+        "incremental_kits_per_100k":
+            incremental_kits_rate,
+
+        "incremental_cost_per_100k":
+            incremental_cost,
     }
 
 
@@ -282,22 +349,12 @@ def run_simulation(
     naloxone_rate
 ):
     """
-    Run the simulator using independent implementation
-    rates for each intervention.
+    Run the complete fiscal simulation.
 
-    Example:
+    Each implementation rate is independent.
 
-        run_simulation(
-            0.50,
-            0.30,
-            0.70
-        )
-
-    means:
-
-        SCS = 50%
-        Virtual monitoring = 30%
-        Naloxone = 70%
+    Implementation rates represent increases relative to the
+    2024 baseline.
     """
 
     scs_rate = validate_implementation_rate(
@@ -312,9 +369,13 @@ def run_simulation(
         naloxone_rate
     )
 
-    scs = simulate_scs(scs_rate)
+    scs = simulate_scs(
+        scs_rate
+    )
 
-    nors = simulate_nors(nors_rate)
+    nors = simulate_nors(
+        nors_rate
+    )
 
     naloxone = simulate_naloxone(
         naloxone_rate
@@ -328,7 +389,49 @@ def run_simulation(
 
 
 # ============================================================
-# 10. TEST
+# 10. FISCAL SUMMARY
+# ============================================================
+
+def calculate_fiscal_summary(results):
+    """
+    Create a summary of the directly modeled fiscal outcomes.
+
+    Important:
+    SCS, NORS, and naloxone outputs do not all share the same
+    geographic/unit basis. Therefore, this function does NOT
+    combine all three costs into one misleading national total.
+
+    The summary focuses on comparable intervention-specific
+    fiscal outputs.
+    """
+
+    scs = results["scs"]
+    nors = results["nors"]
+    naloxone = results["naloxone"]
+
+    return {
+        # SCS
+        "scs_operating_cost":
+            scs["operating_cost"],
+
+        "scs_potential_savings":
+            scs["avoided_emergency_cost"],
+
+        "scs_net_fiscal_impact":
+            scs["net_fiscal_impact"],
+
+        # NORS
+        "nors_program_cost":
+            nors["operating_cost"],
+
+        # Naloxone
+        "naloxone_additional_cost_per_100k":
+            naloxone["incremental_cost_per_100k"],
+    }
+
+
+# ============================================================
+# 11. TEST
 # ============================================================
 
 if __name__ == "__main__":
@@ -339,12 +442,17 @@ if __name__ == "__main__":
         0.70
     )
 
+    fiscal = calculate_fiscal_summary(
+        results
+    )
+
     print()
     print("=" * 70)
-    print("OVERDOSE POLICY SIMULATOR - TEST")
+    print("OVERDOSE POLICY SIMULATOR - FISCAL MODEL TEST")
     print("=" * 70)
 
     print("\nIMPLEMENTATION RATES")
+    print("-" * 70)
 
     print(
         f"SCS: "
@@ -361,8 +469,13 @@ if __name__ == "__main__":
         f"{results['naloxone']['implementation_rate']:.0%}"
     )
 
-    print("\nSCS")
+    print("\nSCS FISCAL OUTCOMES")
     print("-" * 70)
+
+    print(
+        f"Baseline visits/quarter: "
+        f"{results['scs']['baseline_visits']:,.2f}"
+    )
 
     print(
         f"Projected visits/quarter: "
@@ -370,17 +483,27 @@ if __name__ == "__main__":
     )
 
     print(
-        f"Incremental visits: "
+        f"Additional visits: "
         f"{results['scs']['incremental_visits']:,.2f}"
     )
 
     print(
-        f"Avoided emergency cost: "
+        f"Additional non-fatal overdose events: "
+        f"{results['scs']['additional_events']:,.2f}"
+    )
+
+    print(
+        f"Potentially managed onsite: "
+        f"{results['scs']['onsite_events']:,.2f}"
+    )
+
+    print(
+        f"Potential emergency-service savings: "
         f"${results['scs']['avoided_emergency_cost']:,.2f}"
     )
 
     print(
-        f"Operating cost: "
+        f"SCS operating cost: "
         f"${results['scs']['operating_cost']:,.2f}"
     )
 
@@ -393,41 +516,78 @@ if __name__ == "__main__":
     print("-" * 70)
 
     print(
-        f"Projected responses/quarter: "
-        f"{results['nors']['projected_responses']:,.2f}"
-    )
-
-    print(
-        f"Healthcare savings: "
-        f"${results['nors']['healthcare_savings']:,.2f}"
-    )
-
-    print(
-        f"Operating cost: "
+        f"Program cost/quarter: "
         f"${results['nors']['operating_cost']:,.2f}"
     )
 
     print(
-        f"Healthcare-only net impact: "
-        f"${results['nors']['healthcare_net_impact']:,.2f}"
+        "Projected healthcare savings: "
+        "Not calculated."
     )
 
-    print("\nNALOXONE")
+    print(
+        f"Published savings/response: "
+        f"${results['nors']['published_savings_per_response']:,.2f}"
+    )
+
+    print(
+        f"Published BCR: "
+        f"{results['nors']['published_benefit_cost_ratio']:.2f}"
+    )
+
+    print("\nNALOXONE FISCAL OUTCOMES")
     print("-" * 70)
 
     print(
-        f"Projected kits/100k/quarter: "
-        f"{results['naloxone']['projected_kits_per_100k']:,.2f}"
+        f"Baseline distribution rate: "
+        f"{results['naloxone']['baseline_kits_per_100k']:,.2f} "
+        f"kits/100k/quarter"
     )
 
     print(
-        f"Incremental kits/100k: "
-        f"{results['naloxone']['incremental_kits_per_100k']:,.2f}"
+        f"Projected distribution rate: "
+        f"{results['naloxone']['projected_kits_per_100k']:,.2f} "
+        f"kits/100k/quarter"
     )
 
     print(
-        f"Incremental cost/100k: "
-        f"${results['naloxone']['incremental_cost_per_100k']:,.2f}"
+        f"Additional distribution: "
+        f"{results['naloxone']['incremental_kits_per_100k']:,.2f} "
+        f"kits/100k/quarter"
+    )
+
+    print(
+        f"Additional distribution cost: "
+        f"${results['naloxone']['incremental_cost_per_100k']:,.2f} "
+        f"per 100k/quarter"
+    )
+
+    print("\nFISCAL SUMMARY")
+    print("-" * 70)
+
+    print(
+        f"SCS cost: "
+        f"${fiscal['scs_operating_cost']:,.2f}"
+    )
+
+    print(
+        f"SCS potential savings: "
+        f"${fiscal['scs_potential_savings']:,.2f}"
+    )
+
+    print(
+        f"SCS net fiscal impact: "
+        f"${fiscal['scs_net_fiscal_impact']:,.2f}"
+    )
+
+    print(
+        f"NORS program cost: "
+        f"${fiscal['nors_program_cost']:,.2f}"
+    )
+
+    print(
+        f"Naloxone additional cost/100k: "
+        f"${fiscal['naloxone_additional_cost_per_100k']:,.2f}"
     )
 
     print()
