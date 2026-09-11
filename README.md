@@ -15,25 +15,14 @@ The model uses Canadian historical data and evidence-based cost estimates to cal
 To run the simulator:
 
 1. Clone the repository
+Open a terminal and run: git clone https://github.com/jameshuang3013/overdose-policy-simulator.git
 
-Open a terminal and run:
-
-git clone https://github.com/jameshuang3013/overdose-policy-simulator.git
-
-Then move into the project folder:
-
-cd overdose-policy-simulator
 
 2. Install the required packages
+Run: python -m pip install pandas matplotlib streamlit
 
-Run:
-
-python -m pip install pandas matplotlib streamlit
 
 3. Run the simulator
-
-Start the Streamlit application with:
-
-python -m streamlit run src/app.py
+Start the Streamlit application with: python -m streamlit run src/app.py
 
 The application will open in your web browser.
