@@ -2,28 +2,14 @@ import pandas as pd
 from pathlib import Path
 
 
-# ------------------------------------------------------------
-# FILE PATHS
-# ------------------------------------------------------------
-
 RAW_FILE = Path("data/raw/site_counts.csv")
 OUTPUT_FILE = Path("data/processed/site_counts_quarterly.csv")
 
 
-# ------------------------------------------------------------
-# LOAD DATA
-# ------------------------------------------------------------
-
-print("=" * 60)
-print("CREATING CLEAN SITE COUNT DATASET")
-print("=" * 60)
-
 sites = pd.read_csv(RAW_FILE)
 
 
-# ------------------------------------------------------------
 # CREATE QUARTER
-# ------------------------------------------------------------
 
 sites["Month_Number"] = pd.to_datetime(
     sites["Month"],
@@ -35,9 +21,7 @@ sites["Quarter"] = "Q" + (
 ).astype(str)
 
 
-# ------------------------------------------------------------
 # KEEP MODELING PERIOD
-# ------------------------------------------------------------
 
 sites = sites[
     (sites["Year"] >= 2020) &
@@ -45,9 +29,7 @@ sites = sites[
 ].copy()
 
 
-# ------------------------------------------------------------
 # CONVERT TO QUARTERLY DATA
-# ------------------------------------------------------------
 
 quarterly = sites.pivot_table(
     index=["Year", "Quarter"],
@@ -57,9 +39,7 @@ quarterly = sites.pivot_table(
 ).reset_index()
 
 
-# ------------------------------------------------------------
 # RENAME COLUMNS
-# ------------------------------------------------------------
 
 quarterly = quarterly.rename(columns={
     "Total sites": "Total_Sites",
@@ -68,18 +48,15 @@ quarterly = quarterly.rename(columns={
 })
 
 
-# ------------------------------------------------------------
 # SORT
-# ------------------------------------------------------------
+
 
 quarterly = quarterly.sort_values(
     ["Year", "Quarter"]
 ).reset_index(drop=True)
 
 
-# ------------------------------------------------------------
 # CHECK DATA
-# ------------------------------------------------------------
 
 print("\nNumber of quarters:", len(quarterly))
 
@@ -93,9 +70,7 @@ print("\nLast 5 rows:")
 print(quarterly.tail().to_string(index=False))
 
 
-# ------------------------------------------------------------
 # SAVE
-# ------------------------------------------------------------
 
 OUTPUT_FILE.parent.mkdir(
     parents=True,

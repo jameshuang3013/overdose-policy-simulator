@@ -2,38 +2,20 @@ import pandas as pd
 from pathlib import Path
 
 
-# ------------------------------------------------------------
-# FILE PATHS
-# ------------------------------------------------------------
-
 RAW_FILE = Path("data/raw/scs-visits-clients-trends.csv")
 OUTPUT_FILE = Path("data/processed/scs_quarterly.csv")
-
-
-# ------------------------------------------------------------
-# LOAD DATA
-# ------------------------------------------------------------
-
-print("=" * 60)
-print("CREATING CLEAN SCS QUARTERLY DATASET")
-print("=" * 60)
 
 scs = pd.read_csv(RAW_FILE)
 
 
-# ------------------------------------------------------------
 # CONVERT DATE
-# ------------------------------------------------------------
 
 scs["date"] = pd.to_datetime(scs["date"])
-
 scs["Year"] = scs["date"].dt.year
 scs["Quarter"] = "Q" + scs["date"].dt.quarter.astype(str)
 
 
-# ------------------------------------------------------------
 # KEEP MODELING PERIOD
-# ------------------------------------------------------------
 
 scs = scs[
     (scs["Year"] >= 2020) &
@@ -41,9 +23,7 @@ scs = scs[
 ].copy()
 
 
-# ------------------------------------------------------------
 # AGGREGATE MONTHLY DATA TO QUARTERLY DATA
-# ------------------------------------------------------------
 
 scs_quarterly = (
     scs.groupby(["Year", "Quarter"], as_index=False)
@@ -64,10 +44,7 @@ scs_quarterly = (
 )
 
 
-# ------------------------------------------------------------
 # RENAME COLUMNS
-# ------------------------------------------------------------
-
 scs_quarterly = scs_quarterly.rename(columns={
     "trend_total_visits": "SCS_Total_Visits",
     "trend_nr_clients": "SCS_Clients_Monthly_Sum",
@@ -81,18 +58,14 @@ scs_quarterly = scs_quarterly.rename(columns={
 })
 
 
-# ------------------------------------------------------------
 # SORT DATA
-# ------------------------------------------------------------
 
 scs_quarterly = scs_quarterly.sort_values(
     ["Year", "Quarter"]
 ).reset_index(drop=True)
 
 
-# ------------------------------------------------------------
 # VALIDATION
-# ------------------------------------------------------------
 
 print("\nNumber of quarters:", len(scs_quarterly))
 
@@ -106,9 +79,7 @@ print("\nLast 5 rows:")
 print(scs_quarterly.tail())
 
 
-# ------------------------------------------------------------
 # SAVE
-# ------------------------------------------------------------
 
 OUTPUT_FILE.parent.mkdir(
     parents=True,

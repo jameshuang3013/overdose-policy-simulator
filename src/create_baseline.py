@@ -1,26 +1,13 @@
 import pandas as pd
 from pathlib import Path
 
-print("=" * 60)
-print("CREATING 2024 BASELINE DATASET")
-print("=" * 60)
-
-# --------------------------------------------------
-# File paths
-# --------------------------------------------------
 
 INPUT_FILE = Path("data/processed/master_modeling_dataset.csv")
 OUTPUT_FILE = Path("data/processed/baseline_2024.csv")
 
-# --------------------------------------------------
-# Load master dataset
-# --------------------------------------------------
-
 master = pd.read_csv(INPUT_FILE)
 
-# --------------------------------------------------
 # Select 2024 data
-# --------------------------------------------------
 
 baseline_data = master[
     master["Year"] == 2024
@@ -28,9 +15,8 @@ baseline_data = master[
 
 print("\n2024 quarters found:", len(baseline_data))
 
-# --------------------------------------------------
+
 # Variables used for the baseline
-# --------------------------------------------------
 
 baseline_variables = [
     "SCS_Total_Visits",
@@ -47,19 +33,13 @@ baseline_variables = [
     "EMS_Responses"
 ]
 
-# --------------------------------------------------
 # Calculate 2024 annual averages
-# --------------------------------------------------
-
 baseline = baseline_data[baseline_variables].mean().to_frame().T
 
 # Add baseline year
 baseline.insert(0, "Baseline_Year", 2024)
 
-# --------------------------------------------------
 # Check results
-# --------------------------------------------------
-
 print("\n" + "=" * 60)
 print("2024 BASELINE")
 print("=" * 60)
@@ -73,9 +53,8 @@ for column in baseline.columns:
 print("\nMissing values:")
 print(baseline.isna().sum())
 
-# --------------------------------------------------
+
 # Save
-# --------------------------------------------------
 
 OUTPUT_FILE.parent.mkdir(
     parents=True,

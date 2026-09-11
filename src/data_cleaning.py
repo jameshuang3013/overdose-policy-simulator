@@ -2,35 +2,14 @@ import pandas as pd
 from pathlib import Path
 
 
-# ------------------------------------------------------------
-# FILE PATHS
-# ------------------------------------------------------------
-
 RAW_FILE = Path("data/raw/SubstanceHarmsData.csv")
 OUTPUT_FILE = Path("data/processed/health_outcomes_quarterly.csv")
 
 
-# ------------------------------------------------------------
-# LOAD DATA
-# ------------------------------------------------------------
-
-print("=" * 60)
-print("CREATING CLEAN HEALTH OUTCOME DATASET")
-print("=" * 60)
-
 harms = pd.read_csv(RAW_FILE)
 
 
-# ------------------------------------------------------------
 # FILTER USABLE OBSERVATIONS
-# ------------------------------------------------------------
-
-# We only want:
-# - Canada
-# - Overall numbers
-# - Actual counts ("Number")
-# - Quarterly observations
-# - 2017 Q1 through 2024 Q4
 
 clean = harms[
     (harms["Region"] == "Canada") &
@@ -40,10 +19,7 @@ clean = harms[
 ].copy()
 
 
-# ------------------------------------------------------------
 # KEEP MODELING PERIOD
-# ------------------------------------------------------------
-
 valid_periods = []
 
 for year in range(2017, 2025):
@@ -55,10 +31,7 @@ clean = clean[
 ].copy()
 
 
-# ------------------------------------------------------------
 # CONVERT FROM LONG FORMAT TO WIDE FORMAT
-# ------------------------------------------------------------
-
 wide = clean.pivot_table(
     index="Year_Quarter",
     columns="Source",
@@ -67,10 +40,7 @@ wide = clean.pivot_table(
 ).reset_index()
 
 
-# ------------------------------------------------------------
 # RENAME COLUMNS
-# ------------------------------------------------------------
-
 wide = wide.rename(columns={
     "Year_Quarter": "Year_Quarter",
     "Deaths": "Opioid_Deaths",
@@ -80,18 +50,12 @@ wide = wide.rename(columns={
 })
 
 
-# ------------------------------------------------------------
 # SPLIT YEAR AND QUARTER
-# ------------------------------------------------------------
-
 wide["Year"] = wide["Year_Quarter"].str[:4].astype(int)
 wide["Quarter"] = wide["Year_Quarter"].str[-2:]
 
 
-# ------------------------------------------------------------
 # REORDER COLUMNS
-# ------------------------------------------------------------
-
 wide = wide[
     [
         "Year",
@@ -104,34 +68,22 @@ wide = wide[
 ]
 
 
-# ------------------------------------------------------------
 # SORT
-# ------------------------------------------------------------
-
 wide = wide.sort_values(
     ["Year", "Quarter"]
 ).reset_index(drop=True)
 
 
-# ------------------------------------------------------------
 # CHECK FOR MISSING VALUES
-# ------------------------------------------------------------
-
 print("\nMissing values:")
 print(wide.isna().sum())
 
 
-# ------------------------------------------------------------
 # CHECK NUMBER OF ROWS
-# ------------------------------------------------------------
-
 print("\nNumber of quarters:", len(wide))
 
 
-# ------------------------------------------------------------
 # SHOW DATA
-# ------------------------------------------------------------
-
 print("\nFirst 5 rows:")
 print(wide.head())
 
@@ -139,10 +91,7 @@ print("\nLast 5 rows:")
 print(wide.tail())
 
 
-# ------------------------------------------------------------
 # SAVE
-# ------------------------------------------------------------
-
 OUTPUT_FILE.parent.mkdir(
     parents=True,
     exist_ok=True

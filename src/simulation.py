@@ -2,31 +2,11 @@ from pathlib import Path
 import pandas as pd
 
 
-# ============================================================
-# OVERDOSE POLICY SIMULATOR
-# Fiscal Simulation Engine
-# Canada - 2024 baseline
-# ============================================================
-
-
-# ============================================================
-# 1. PROJECT PATHS
-# ============================================================
-
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data" / "processed"
 
 
-# ============================================================
-# 2. MODEL PARAMETERS
-# ============================================================
-
-
-# ------------------------------------------------------------
-# Supervised Consumption Services (SCS)
-# ------------------------------------------------------------
-
-# Provisional operating cost transferred from Calgary Safeworks
+# Provisional operating cost
 SCS_COST_PER_VISIT = 52.00
 
 # 2024 Safeworks:
@@ -41,9 +21,7 @@ SCS_ONSITE_MANAGEMENT_RATE = 1 - (9 / 1035)
 SCS_AVOIDED_EMERGENCY_COST = 1622.00
 
 
-# ------------------------------------------------------------
 # Virtual Overdose Monitoring (NORS)
-# ------------------------------------------------------------
 
 # Program-level cost assumption
 NORS_PROGRAM_COST_2_YEARS = 1_592_000.00
@@ -66,26 +44,16 @@ NORS_CALL_COST_THRESHOLD = 450.00
 NORS_BENEFIT_COST_RATIO = 8.59
 
 
-# ------------------------------------------------------------
 # Naloxone
-# ------------------------------------------------------------
 
 # Provisional cost assumption
 NALOXONE_COST_PER_KIT = 50.00
 
 
-# ============================================================
-# 3. LOAD 2024 BASELINE
-# ============================================================
 
 baseline_path = DATA_DIR / "baseline_2024.csv"
-
 baseline = pd.read_csv(baseline_path).iloc[0]
 
-
-# ============================================================
-# 4. BASELINE VALUES
-# ============================================================
 
 # SCS
 BASELINE_SCS_VISITS = float(
@@ -109,9 +77,7 @@ BASELINE_NALOXONE_RATE = float(
 )
 
 
-# ============================================================
 # 5. INPUT VALIDATION
-# ============================================================
 
 def validate_implementation_rate(implementation_rate):
     """
@@ -143,9 +109,7 @@ def validate_implementation_rate(implementation_rate):
     return implementation_rate
 
 
-# ============================================================
 # 6. SCS FISCAL CALCULATION
-# ============================================================
 
 def simulate_scs(implementation_rate):
     """
@@ -163,9 +127,7 @@ def simulate_scs(implementation_rate):
         implementation_rate
     )
 
-    # --------------------------------------------------------
     # Additional activity
-    # --------------------------------------------------------
 
     incremental_visits = (
         BASELINE_SCS_VISITS * rate
@@ -176,45 +138,35 @@ def simulate_scs(implementation_rate):
         incremental_visits
     )
 
-    # --------------------------------------------------------
     # Estimate additional non-fatal overdose events
-    # --------------------------------------------------------
 
     additional_events = (
         incremental_visits *
         SCS_EVENT_RATE
     )
 
-    # --------------------------------------------------------
     # Estimate events potentially managed onsite
-    # --------------------------------------------------------
 
     onsite_events = (
         additional_events *
         SCS_ONSITE_MANAGEMENT_RATE
     )
 
-    # --------------------------------------------------------
     # Potential emergency-service savings
-    # --------------------------------------------------------
 
     avoided_emergency_cost = (
         onsite_events *
         SCS_AVOIDED_EMERGENCY_COST
     )
 
-    # --------------------------------------------------------
     # Additional SCS operating cost
-    # --------------------------------------------------------
 
     operating_cost = (
         incremental_visits *
         SCS_COST_PER_VISIT
     )
 
-    # --------------------------------------------------------
     # Net fiscal impact
-    # --------------------------------------------------------
 
     net_fiscal_impact = (
         avoided_emergency_cost -
@@ -234,9 +186,7 @@ def simulate_scs(implementation_rate):
     }
 
 
-# ============================================================
 # 7. VIRTUAL OVERDOSE MONITORING FISCAL CALCULATION
-# ============================================================
 
 def simulate_nors(implementation_rate):
     """
@@ -284,9 +234,7 @@ def simulate_nors(implementation_rate):
     }
 
 
-# ============================================================
 # 8. NALOXONE FISCAL CALCULATION
-# ============================================================
 
 def simulate_naloxone(implementation_rate):
     """
@@ -300,9 +248,7 @@ def simulate_naloxone(implementation_rate):
         implementation_rate
     )
 
-    # --------------------------------------------------------
     # Additional distribution
-    # --------------------------------------------------------
 
     incremental_kits_rate = (
         BASELINE_NALOXONE_RATE *
@@ -314,9 +260,7 @@ def simulate_naloxone(implementation_rate):
         incremental_kits_rate
     )
 
-    # --------------------------------------------------------
     # Additional distribution cost
-    # --------------------------------------------------------
 
     incremental_cost = (
         incremental_kits_rate *
@@ -339,9 +283,7 @@ def simulate_naloxone(implementation_rate):
     }
 
 
-# ============================================================
-# 9. COMPLETE SIMULATION
-# ============================================================
+# COMPLETE SIMULATION
 
 def run_simulation(
     scs_rate,
@@ -388,9 +330,7 @@ def run_simulation(
     }
 
 
-# ============================================================
-# 10. FISCAL SUMMARY
-# ============================================================
+# FISCAL SUMMARY
 
 def calculate_fiscal_summary(results):
     """
@@ -430,11 +370,9 @@ def calculate_fiscal_summary(results):
     }
 
 
-# ============================================================
-# 11. TEST
-# ============================================================
-
-if __name__ == "__main__":
+# TEST
+"""
+"if __name__ == "__main__":
 
     results = run_simulation(
         0.50,
@@ -592,3 +530,4 @@ if __name__ == "__main__":
 
     print()
     print("=" * 70)
+    """
